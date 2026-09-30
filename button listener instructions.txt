@@ -1,0 +1,28 @@
+chmod +x /home/admin/Image_Draw/image_draw.py
+chmod +x /home/admin/Image_Draw/button_trigger.py
+
+run listener script
+python3 /home/admin/Image_Draw/button_trigger.py
+
+to make it run on boot
+sudo nano /etc/systemd/system/epd_button.service
+then paste this
+
+[Unit]
+Description=e-Paper Button Listener
+After=multi-user.target
+
+[Service]
+Type=simple
+User=admin
+WorkingDirectory=/home/admin/Image_Draw
+ExecStart=/usr/bin/python3 /home/admin/Image_Draw/button_trigger.py
+Restart=on-failure
+
+[Install]
+WantedBy=multi-user.target
+
+enable it and start
+sudo systemctl daemon-reload
+sudo systemctl enable epd_button.service
+sudo systemctl start epd_button.service
