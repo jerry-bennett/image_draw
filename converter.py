@@ -59,7 +59,7 @@ def convert_for_spectra6(input_path, output_path, target_size=(600, 400)):
     final_img.save(output_file, "BMP")
     print(f"Converted '{input_file}' -> '{output_file}' (Adjusted & Dithered)")
 
-def batch_convert(raw_dir=r"Image_Draw\raw_images", pic_dir=r"Image_Draw\pic"):
+def batch_convert(raw_dir=r"raw_images", pic_dir=r"pic"):
     raw_path = Path(raw_dir)
     pic_path = Path(pic_dir)
 
