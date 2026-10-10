@@ -1,0 +1,8 @@
+; ESP32 Partition Scheme for Bootloader + Sketch (Camera Streaming)
+; Format: name,type,offset,length,flags
+
+# Bootloader and camera framework take first 8MB of flash
+nvs,data,0x10000,0x40000,,roiram
+ota_app,application,0x10000,0x80000,,runtime
+app,sbin,0x10000,0xC0000,,,
+bootloader,sbin,0x0,0x80000,,,

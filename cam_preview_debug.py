@@ -7,7 +7,7 @@ import sys
 
 PORT = sys.argv[1] if len(sys.argv) > 1 else 'COM5'
 
-print(f"Connecting to {PORT} at 921600 baud (ESP32 Camera Bootloader)...")
+print(f"Connecting to {PORT} at 115200 baud (ESP32 firmware USB Serial)...")
 
 try:
     ser = serial.Serial(PORT, 921600, timeout=1)
@@ -31,15 +31,32 @@ while True:
             time.sleep(0.05)
             continue
 
+        # Print raw data with error message detection
         print(f"\n--- RAW DATA (first {min(100, len(data))} bytes) ---")
         for i in range(0, min(100, len(data)), 10):
             chunk = data[i:i+10]
             hex_str = ''.join(f'{b:02x}' for b in chunk)
             ascii_str = ''.join(chr(b) if 32 <= b < 127 else '.' for b in chunk)
-            print(f"{i:4d}: {hex_str} {'{0:{width}}'.format(ascii_str, width=8)}")
+            print(f"{i:4d}: {hex_str} '{ascii_str}'")
 
-        # Look for START marker (ESP32 sends "START" sequence)
-        if data.startswith(b'START') or data.startswith(b'SIZE'):
+        # Check for error messages
+        error_patterns = [b'Camera capture', b'capture failed', b'failed']
+        is_error = False
+        for pattern in error_patterns:
+            if pattern in data:
+                print(f"\n*** ERROR DETECTED: {data.find(pattern) > 0 and ' or '.join(patterns.split()) or 'error message' } ***")
+                print("ESP32 Camera Bootloader may be stuck!")
+
+                # Clear the error buffer and wait longer for next attempt
+                data = ser.read(4096)
+                total_data = b''.join([data])
+                time.sleep(5)  # Wait longer between attempts
+                print("\nWaiting for ESP32 to reset...")
+
+                is_error = True
+                break
+
+        if not is_error and (b'START' in data or b'SIZE' in data):
             print("\n*** FOUND COMMUNICATION MARKER ***")
 
             if b'SIZE' in data:

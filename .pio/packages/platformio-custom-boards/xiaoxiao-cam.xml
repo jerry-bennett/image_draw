@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- XIAO ESP32S3 Camera Module Board Definition for PlatformIO -->
+<!-- This custom board defines pins specific to XIAO ESP32S3 with OV7670/OV5640 camera sensor -->
+<platformio:variant xmlns:platformio="http://platformio.org/xml" name="xiao-esp32-s3-cam-v1.0" display_name="XIAO ESP32S3 CAM">
+    <name>xiao-esp32-s3-cam</name>
+    <display_name>XIAO ESP32S3 Camera Module (XIAO ESP32S3 CAM)</display_name>
+
+    <!-- Standard ESP32-S3 Pin Configuration for WaveShare XIAO ESP32S3 -->
+    <hardware_pins>
+        <!-- P29 - CAM_S - Camera Select Pin -->
+        <pin name="CAM_S" pinnum=29 mode="in pullup"/>
+        <!-- P30 - I2C_SCL - I2C Clock for Camera Sensor -->
+        <pin name="I2C_SCL" pinnum=39 mode="analog"/>
+        <!-- P31 - D_CAM - Camera Data Output Pin -->
+        <pin name="D_CAM" pinnum=40 mode="analog"/>
+        <!-- P32 - CSI_CS - SPI Chip Select Pin -->
+        <pin name="CSI_CS" pinnum=38 mode="output low"/>
+    </hardware_pins>
+
+    <!-- ESP Camera Library Pin Configuration (for esp-arduino) -->
+    <!-- Matches esp_camera.cpp XIAO_ESP32_S3_CAM_MODULE configuration -->
+    <esp_camera_pins>
+        <pin pin_num="CAM_S" default_mode="in pullup"/>
+        <pin pin_num="I2C_SCL" default_mode="analog"/>
+        <pin pin_num="D_CAM" default_mode="analog"/>
+        <pin pin_num="CSI_CS" default_mode="output low"/>
+    </esp_camera_pins>
+
+</platformio:variant>

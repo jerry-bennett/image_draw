@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- XIAO ESP32S3 Camera Board Definition for PlatformIO -->
+<platformio:variant xmlns:platformio="http://platformio.org/xml" name="esp32s3-xiao-esp32-s3-cam-v1.0" display_name="XIAO ESP32S3 CAM">
+    <name>xiao-esp32-s3-cam</name>
+    <display_name>XIAO ESP32S3 Camera Module (XIAO ESP32S3 CAM)</display_name>
+
+    <!-- Hardware Definition -->
+    <hardware_definition>
+        <!-- XIAO ESP32S3 Pinout for Camera Sensor -->
+        <pins>
+            <pin name="CAM_S" pinnum=29 mode="in pullup" />
+            <pin name="I2C_SCL" pinnum=39 mode="analog" />
+            <pin name="D_CAM" pinnum=40 mode="analog" />
+            <pin name="CSI_CS" pinnum=38 mode="output low" />
+        </pins>
+    </hardware_definition>
+
+    <!-- ESP32 Pin Definitions for Camera -->
+    <esptouches:esptouches>
+        <esptouches:esptouches>
+            <esptouches:pin name="CAM_S" mode="in pullup"/>
+            <esptouches:pin name="I2C_SCL" mode="analog"/>
+            <esptouches:pin name="D_CAM" mode="analog"/>
+        </esptouches:esptouches>
+    </esptouches:esptouches>
+
+    <!-- ESP32 Pin Definitions for Camera -->
+    <esp_pins>
+        <esp_camera_pin pin_num="CAM_S" default_mode="in pullup" />
+        <esp_camera_pin pin_num="I2C_SCL" default_mode="analog" />
+        <esp_camera_pin pin_num="D_CAM" default_mode="analog" />
+        <esp_camera_pin pin_num="CSI_CS" default_mode="output low" />
+    </esp_pins>
+</platformio:variant>

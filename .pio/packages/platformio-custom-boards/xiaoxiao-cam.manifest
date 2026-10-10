@@ -1,0 +1,11 @@
+name: xiaoxiao-cam-v1.0
+description: XIAO ESP32S3 Camera Module for PlatformIO (WaveShare)
+license: MIT
+version: 1.0.0
+author: User
+repository: https://github.com/thesai/WaveShare-Devices-Xiaoxiaomacros
+
+dependencies:
+    - espressif/esp32@^5.1.1
+
+build_command = build.py $CONFIG_FILE_PATH -o $PROJECT_DIR/build/$BUILD_NAME-xiao-esp32-s3-cam-v1.0

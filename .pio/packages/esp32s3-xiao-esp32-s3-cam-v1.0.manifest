@@ -1,0 +1,10 @@
+name: esp32s3-xiao-esp32-s3-cam-v1.0
+description: XIAO ESP32S3 with Camera Module (XIAO ESP32S3 CAM)
+license: MIT
+version: 1.0.0
+author: WaveShare
+repository: https://github.com/thesai/WaveShare-Devices-Xiaoxiaomacros
+url: https://waveshare.cc
+
+dependencies:
+    - espressif/esp32s3

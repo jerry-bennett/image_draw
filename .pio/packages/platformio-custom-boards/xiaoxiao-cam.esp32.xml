@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- ESP32-S3 Pin Configuration for XIAO ESP32S3 Camera -->
+<!-- This overrides default esp32s3 pin definitions -->
+<platformio:variant xmlns:platformio="http://platformio.org/xml" name="esp32-s3-xiao-cam-v1.0" display_name="XIAO ESP32S3 CAM (ESP32-S3 Variant)">
+    <name>xiaoxiao-cam</name>
+    <display_name>XIAO ESP32S3 Camera Module - XIAO ESP32S3 CAM</display_name>
+
+    <!-- Standard ESP32-S3 pin configuration for WaveShare -->
+    <!-- Uses esp-arduino library defaults + manual override -->
+    <hardware_pins>
+        <!-- XIAO ESP32S3 Camera Module (WaveShare) -->
+        <pin name="CAM_S" pinnum=29 mode="in pullup"/>
+        <pin name="I2C_SCL" pinnum=39 mode="analog"/>
+        <pin name="D_CAM" pinnum=40 mode="analog"/>
+        <pin name="CSI_CS" pinnum=38 mode="output low"/>
+    </hardware_pins>
+
+    <!-- ESP Camera Library Pin Configuration -->
+    <!-- Matches esp_camera.cpp XIAO_ESP32_S3_CAM_MODULE configuration -->
+    <esp_camera_pins>
+        <pin pin_num="CAM_S" default_mode="in pullup"/>
+        <pin pin_num="I2C_SCL" default_mode="analog"/>
+        <pin pin_num="D_CAM" default_mode="analog"/>
+        <pin pin_num="CSI_CS" default_mode="output low"/>
+    </esp_camera_pins>
+
+    <!-- ESP32 Touches Configuration -->
+    <esptouches:esptouches>
+        <esptouches:pin name="CAM_S" mode="in pullup"/>
+        <esptouches:pin name="I2C_SCL" mode="analog"/>
+        <esptouches:pin name="D_CAM" mode="analog"/>
+    </esptouches:esptouches>
+
+</platformio:variant>
