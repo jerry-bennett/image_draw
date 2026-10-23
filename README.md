@@ -1,358 +1,183 @@
-# image_draw
+# E-Ink Camera Viewer Project (Windows)
 
-A simple e-Paper (e-ink) display control system for Raspberry Pi with touch button interface and camera streaming support.
-
-## 🎯 Purpose
-
-Control an e-paper display from a **Raspberry Pi** using a **touch button controller** on a **XIAO ESP32S3** board. The system supports:
-- Single image display (long press > 3s)
-- Clear screen (double tap within 0.4s)
-- Live camera preview via USB serial (ESP32 sends MJPEG frames to Pi)
+A hardware project that captures photos from a XIAO ESP32-S3 Sense camera board over WiFi, converts them to BMP format on a Raspberry Pi 3, and displays them on a Waveshare Spectra6 4-inch E-Ink display.
 
 ---
 
-## 📋 Hardware Setup
+## 📋 Project Overview
 
-### Raspberry Pi Side
+This integrated system consists of three components working together:
+
+1. **XIAO ESP32-S3 Sense** with pre-installed camera firmware that streams video over WiFi
+2. **Raspberry Pi 3** running a Python script that captures JPEG frames from the ESP32, converts them to BMP, and displays them on an E-Ink display
+3. **Waveshare Spectra6 4" E-Ink Display (E6)** connected to the Raspberry Pi for viewing captured photos
+
+---
+
+## 🔧 Hardware Components
+
 | Component | Description |
 |-----------|-------------|
-| e-Paper Display | 4" (400×600), 7-color dithering |
-| Waveshare EPD Driver | Python SDK in `lib/waveshare_epd/` |
-
-### Controller Side (XIAO ESP32S3)
-| Component | Description |
-|-----------|-------------|
-| XIAO ESP32S3 CAM Board | Arduino-compatible, USB serial over WSL |
-| Touch Button | BCM pin 26 (physical pin 37) |
-| Built-in OLED | 0.96" (128x64), camera preview display |
-
-### Connection
-- Connect XIAO ESP32S3 to Pi via **USB-C cable**
-- Ensure XIAO is powered on before connecting
+| XIAO ESP32-S3 Sense | WiFi-enabled ESP32 board with OV5640/OV3660 camera sensor |
+| Raspberry Pi 3 | Runs the camera capture and E-Ink display software |
+| Waveshare Spectra6 E-Ink Display | 4-inch color e-ink display (E Ink Color HAT) |
+| Custom Button | Soldered button on Pi to trigger photo capture |
 
 ---
 
-## 📂 Project Structure
+## 📡 ESP32 Camera Stream
+
+The XIAO ESP32-S3 Sense streams MJPEG video frames over HTTP at the following endpoint:
 
 ```
-image_draw/
-├── lib/waveshare_epd/              # e-Paper driver library
-│   ├── epd4in0e.py                 # 4" display class (400×600)
-│   ├── epdconfig.py                 # GPIO/SPI abstraction
-│   └── DEV_Config_*.so             # Hardware driver binaries
-├── pic/                             # Image storage
-│   ├── 01.bmp                      # Sample image
-│   └── Font.ttc                    # Font file
-├── image_draw.py                    # Main display script
-├── clear.py                         # Clear screen script
-├── button_trigger.py                # USB button controller
-│
-# ESP32 Camera Bootloader Sketches (USB serial + MJPEG streaming)
-├── esp32_camera.cpp                 # Primary camera sketch - sends frames via USB
-├── esp32_simple.cpp                  # Simple OLED preview sketch on XIAO board
-├── esp32_camera_test.cpp             # Debug/monitor mode sketch
-├── esp32_camera_v2.cpp               # MJPEG stream with START handshake
-└── esp32_camera_v3.cpp               # Optimized MJPEG streaming (REV 3)
-│
-# Camera preview & debugging scripts on Pi
-├── cam_preview.py                    # OpenCV camera preview in window
-├── cam_preview_debug.py              # Raw data inspector for ESP32 boot mode
-│
-# Windows batch files
-├── camera_feed.bat                    # Run camera feed with admin access
-├── run_camera.bat                     # Quick camera test (dual windows)
-├── test_camera.bat                    # Test via WSL
-├── run_camera_admin.bat               # Admin-privileged camera run
-└── enable_admin_usb.bat               # Enable permanent USB admin access
-│
-# Utilities
-├── check_usb.py                      # Quick USB serial port checker
-├── converter.py                       # BMP to e-Paper color converter
-├── env_refresh.ps1                    # PowerShell environment refresh script
-└── button listener instructions.txt   # Button trigger setup guide
+http://<ESP32_IP_ADDRESS>:8080/stream.txt
 ```
+
+### ESP32 Setup Options
+
+**Option A: WiFi Network (Recommended)**
+- Connect ESP32 to your home WiFi network first
+- Capture IP address from `ipconfig /all` on Windows
+
+**Option B: Access Point Mode**
+- Default SSID: `XIAO_ESP32S3_Sense`
+- Default Password: `seeedstudio`
+- Access point IP: Usually `192.168.4.1` (configurable)
 
 ---
 
-## 🚀 Quick Start (Raspberry Pi Side)
+## 🐛 Raspberry Pi Setup
 
-### 1. Install Dependencies
+The Raspberry Pi runs a Python script that:
+1. Connects to the ESP32 camera stream over WiFi
+2. Downloads JPEG frames continuously (~2 FPS)
+3. Converts each frame to BMP format for E-Ink display
+4. Renders the BMP on the Waveshare Spectra6 E-Ink display
 
-On Raspberry Pi (WSL2):
-```bash
-# Install Waveshare e-Paper SDK
-pip install opencv-python numpy pyserial spidev gpiozero
+### Prerequisites
 
-# Clone/Download this project to `/home/pi/image_draw`
-cd /home/pi/image_draw
-```
-
-### 2. Button Trigger Configuration
-
-The touch button is configured on **BCM pin 26** (physical pin 37):
-- **Hold > 3 seconds**: Display an image from `pic/01.bmp`
-- **Double tap (< 0.4s between presses)**: Clear the screen
-
-### 3. Running on Pi
+#### Raspberry Pi OS Packages
 
 ```bash
-# Start button controller (runs continuously, waiting for events)
-python3 /home/pi/image_draw/button_trigger.py
-
-# Start display script (when hold triggered)
-python3 /home/pi/image_draw/image_draw.py
+# Install required packages
+sudo apt update
+sudo apt install -y rpi-camera libjpeg-dev python3-pip
+pip3 install opencv-python Pillow scapy requests
 ```
 
-### 4. Camera Integration (Optional/Future)
+#### Camera Interface Setup
 
-For XIAO ESP32S3 camera capture:
+Connect the Spectra6 E-Ink display to the Pi. Configure the Raspberry Pi Camera module to use your E-Ink display interface:
 
-**ESP32 Sketch:** `esp32_camera.cpp` or `esp32_camera_v3.cpp`
-**Pi Preview Script:** `cam_preview.py`
-**Debug Tool:** `cam_preview_debug.py`
+```bash
+# Set up camera interface (adjust for your display configuration)
+sudo nano /boot/config.txt
+```
 
-See [CAMERA_SETUP.md](CAMERA_SETUP.md) for detailed instructions.
+Add or modify lines as needed for your E-Ink HAT connection. Common settings include:
+
+```
+# Waveshare Spectra6 E-Ink Display settings
+# Replace with your actual display settings
+dtoverlay=spi3-hd430pga5a-8bit=2,0=hdmi_cvt
+```
+
+**Note:** The specific configuration depends on your display's GPIO pin mapping. Check Waveshare documentation or identify pins using the camera config tool.
 
 ---
 
-## 🛠️ Building & Running on Windows Host
+## 🎮 How to Take a Photo
 
-### Step 1: Verify Serial Port
-```bash
-# List available COM ports
-python3 -c "import serial; from serial.tools import list_ports; [print(f'{p}: {p.device}') for p in list_ports.comports()]"
+Use the custom button you soldered to the Raspberry Pi:
 
-# Quick USB check (sees if ESP32 is sending data)
-python3 check_usb.py  # Uses default COM5
-```
-
-### Step 2: Enable Admin Access (If Needed)
-
-Some ESP32 boards require admin privileges to access the USB serial port:
-```bash
-# Permanently enable admin access for COM5
-enable_admin_usb.bat
-
-# Or set via Device Manager:
-# 1. Open Device Manager → Universal Serial Bus controllers
-# 2. Right-click XIAO ESP32S3 → Properties → Access tab
-# 3. Check "Allow administrator to access"
-```
-
-### Step 3: Upload ESP32 Sketch
-
-**Arduino CLI method:**
-```bash
-arduino-cli core install esp32 @espressif:esp32
-arduino-cli upload --fqbn esp32:esp32s3:xiao-esp32-s3-cam-v1.0 esp32_camera.cpp
-```
-
-**PlatformIO method:**
-- Install PlatformIO IDE in VS Code
-- Upload sketch via Arduino IDE or PlatformIO CLI
-
-### Step 4: Run Camera Feed
-
-**Option A: Quick run (dual Windows windows)**
-```bash
-# Starts both ESP32 debug viewer and camera preview
-run_camera.bat
-```
-
-**Option B: With admin access (recommended for some boards)**
-```bash
-# Run as Administrator, starts camera feed
-camera_feed.bat
-```
-
-**Option C: Via WSL**
-```bash
-test_camera.bat
-```
+1. Ensure ESP32 is connected to WiFi and streaming
+2. Verify the camera stream endpoint works (e.g., from another device):
+   ```
+   http://<ESP32_IP>:8080/stream.txt
+   ```
+3. Press your custom button on the Raspberry Pi
+4. The script captures a frame, converts to BMP, and displays it on the E-Ink screen
 
 ---
 
-## 🖥️ Camera Feed Flow
+## 📊 Display Options
 
-```
-┌─────────────────────────────┐
-│    XIAO ESP32S3             │
-│  ┌─────── Touch Button ────┤
-│  │  ┌───────── OLED Preview┤
-│  │  │     (0.96" 128x64)   │
-│  │  └───── Camera Sensor───┤
-│  │         (OV7670/5640)   │
-│  └─── USB → Pi             │
-│                             │
-└─────────────────────────────┘
-              │ (when hold > 3s)
-              ▼
-┌─────────────────────────────┐
-│    Raspberry Pi (WSL)       │
-│      cam_preview.py         │  ← Shows live MJPEG stream
-│        button_trigger.py    │  ← Detects trigger events
-│ └──→ e-Paper Display        │  ← Shows image from pic/01.bmp
-└─────────────────────────────┘
-```
-
-**ESP32 → Pi Data Protocol:**
-1. ESP32 captures MJPEG frame (OV7670/OV5640 sensor)
-2. Sends `START` handshake (5 bytes)
-3. Sends frame size (4-byte little-endian uint32)
-4. Streams JPEG payload directly over USB serial
-5. Pi receives and displays via OpenCV preview
+- **Frame Rate**: Adjustable (~2 FPS default)
+- **Resolution**: Dependent on ESP32 camera sensor (OV5640: 2592×1944, OV3660: 2048×1536, OV2640: 1600×1200)
+- **Format**: JPEG (stream) → BMP (E-Ink display)
 
 ---
 
-## 📝 Configuration Files
+## 🔧 Troubleshooting
 
-### ESP32 Camera Sketches
+### Connection Failed?
 
-| File | Purpose | Features |
-|------|---------|----------|
-| `esp32_camera.cpp` | Primary camera sketch | Full MJPEG streaming protocol |
-| `esp32_simple.cpp` | OLED preview only | Shows frames on XIAO's built-in screen |
-| `esp32_camera_test.cpp` | Debug/monitor mode | Basic frame output, sensor ID test |
-| `esp32_camera_v2.cpp` | MJPEG stream v2 | START handshake protocol |
-| `esp32_camera_v3.cpp` | Optimized streaming | REV 3 with callback-based capture |
-
-### Python Scripts on Pi
-
-| File | Purpose |
-|------|---------|
-| `cam_preview.py` | OpenCV camera preview (visual display) |
-| `cam_preview_debug.py` | Raw byte inspector for ESP32 boot mode |
-| `check_usb.py` | Quick serial port checker (COM5 default) |
-
-### Windows Batch Files
-
-| File | Purpose |
-|------|---------|
-| `camera_feed.bat` | Full camera feed with admin access |
-| `run_camera.bat` | Quick test (dual windows - debug + preview) |
-| `test_camera.bat` | Run via WSL command prompt |
-| `run_camera_admin.bat` | Admin-privileged single session |
-| `enable_admin_usb.bat` | Enable permanent USB admin access |
-
----
-
-## 🔧 Configuration Files
-
-### `button_trigger.py`
-- Port configuration (default: Windows COM5, adjust to actual port)
-- Double-tap threshold: 0.4 seconds
-- Hold trigger time: 3 seconds
-
-### `image_draw.py`
-- Reads image from `/home/pi/image_draw/pic/01.bmp`
-- Converts to 7-color palette for e-Paper display
-- Uses SPI bus (config in `waveshare_epd`)
-
-### `clear.py`
-- Simple screen clearing utility
-
----
-
-## 🛠️ Building & Running on Windows Host
-
-### Step 1: Verify Serial Port
-```bash
-# List available COM ports
-python3 -c "import serial; from serial.tools import list_ports; [print(f'{p}: {p.device}') for p in list_ports.comports()]"
-
-# Run preview script
-python3 cam_preview.py <COM_PORT>  # e.g., python3 cam_preview.py COM5
-```
-
-### Step 2: Upload ESP32 Sketch
-
-**Arduino CLI method:**
-```bash
-arduino-cli core install esp32 @espressif:esp32
-arduino-cli upload --fqbn esp32:esp32s3:xiao-esp32-s3-cam-v1.0 esp32_camera.cpp
-```
-
-**PlatformIO method:**
-- Install PlatformIO IDE in VS Code
-- Upload sketch via Arduino IDE or PlatformIO CLI
-
-### Step 3: Run Button Controller on Windows (Optional)
-Test button detection locally before deploying to Pi:
-```bash
-python3 button_trigger.py <COM_PORT>
-```
-
----
-
-## 📸 Expected Flow
-
-```
-┌──────────────────────┐
-│ XIAO ESP32S3         │
-│ ┌─── Touch Button ───┤
-│ └─── USB → Pi        │
-│                     │
-└──────────────────────┘
-              │ (when hold > 3s)
-              ▼
-┌──────────────────────┐
-│ Raspberry Pi (WSL)   │
-│ button_trigger.py    │  → Run image_draw.py
-│ └──→ e-Paper Display│  → Show pic/01.bmp
-└──────────────────────┘
-
-Camera Feed Flow:
-┌─────────────────┐       ┌─────────────────┐
-│ ESP32 OLED      │       │ OpenCV Window    │
-│ Preview (local) │ ◄─────► │ cam_preview.py  │
-└─────────────────┘       └────────┬──────────┘
-                                    │ USB Serial (115200/921600)
-                                    ▼
-                               ┌─────────────────┐
-                               │ Raw Data Viewer │
-                               │ cam_preview_    │
-                               │  debug.py        │
-                               └─────────────────┘
-```
-
----
-
-## 🔍 Troubleshooting
-
-### Grey Screen / No Output
 | Issue | Solution |
-|-------|-------------|
-| Grey screen on e-ink | Check e-Paper display is powered on (check DC/CS pins) |
-| Button not responding | Verify serial port number matches actual COM/ttyACM0 |
-| Image not displaying | Check image dimensions match e-paper (400×600) |
+|-------|----------|
+| ESP32 won't connect to WiFi | Reboot ESP32, try default AP credentials |
+| No stream at `http://<ESP32_IP>:8080/stream.txt` | Verify camera firmware is running (check LED status) |
+| Camera stream shows "CAMERA" or similar error | Check ESP32 console output in serial monitor |
 
-### USB Serial Issues
-| Issue | Solution |
-|-------|-------------|
-| "Failed to open port" | Check Windows Device Manager or `ls -l /dev/ttyACM*` on WSL |
-| Wrong baud rate | Set to 115200 (default in scripts) or try 921600 for ESP32 bootloader |
-| Missing COM ports | Ensure XIAO ESP32S3 is powered and connected |
-| Port requires admin access | Run `enable_admin_usb.bat` or enable via Device Manager Access tab |
+### Raspberry Pi Display Issues?
 
-### ESP32 Camera Issues
-| Issue | Solution |
-|-------|-------------|
-| No camera frames | Check OV7670/OV5640 sensor initialization in sketch |
-| MJPEG stream broken | Verify START/size protocol matches between ESP32 and Pi scripts |
-| XIAO OLED black screen | Check pin configuration (P29-P32) in sketch |
+- Ensure the E-Ink display is properly powered and connected to Pi GPIO
+- Verify the BMP-to-E-Ink conversion script is running correctly
+- Check that the E-Ink library is compatible with your Spectra6 model
+- Confirm the custom button wiring is connecting to a GPIO pin (typically GPIO 4/17 or similar)
 
-### e-Paper Display Issues
-| Issue | Solution |
-|-------|-------------|
-| Black screen on startup | Check reset pin timing in `waveshare_epd/epdconfig.py` |
-| Image corrupted | Verify BMP file exists in `/pic/` directory |
-| Color artifacts | Ensure BMP is converted to 7-color palette before display |
+### Common Problems
+
+- **ESP32 Camera disabled**: Reboot ESP32 firmware or adjust boot settings
+- **Resolution mismatch**: Adjust conversion script if BMP dimensions don't match E-Ink display resolution
+- **WiFi connectivity**: Ensure both devices are on the same network and ESP32 is within WiFi range of Pi
 
 ---
 
-## 📝 License
+## 📚 Documentation References
 
-MIT License - See individual project files for full terms.
+### XIAO ESP32-S3 Sense Board
+
+- **[XIAO ESP32-S3 Getting Started Guide](https://wiki.seeedstudio.com/xiao_esp32s3_getting_started/)** - Basic board setup, flashing firmware, and configuration
+- **[ESP32 Camera Guide](https://www.seeedstudio.com/blog/2026/05/06/esp32-camera-guide/)** - Camera module setup, MJPEG streaming, and frame capture
+
+### Waveshare Spectra6 E-Ink Display
+
+- **Waveshare Spectra6 Documentation** - Official Waveshare documentation for display configuration and driver information
+
+---
+
+## 🛠️ Development Tools
+
+This project uses the following development environments:
+
+| Component | Development Environment | Notes |
+|-----------|------------------------|-------|
+| XIAO ESP32-S3 Sense | **Arduino IDE** | Used for testing and debugging C++ scripts on the ESP32 board |
+| Raspberry Pi 3 | **VS Code** | Used for developing and running Python scripts that handle camera capture and E-Ink display |
+
+### ESP32 Development Setup (Arduino IDE)
+
+1. Install Arduino IDE with ESP32 support
+2. Connect XIAO ESP32-S3 Sense via USB
+3. Use the built-in serial monitor for debugging camera output
+4. Flash C++ scripts using the Arduino IDE board manager
+
+### Raspberry Pi Development Setup (VS Code)
+
+1. Install Python 3 and required packages on Pi
+2. Open VS Code with remote SSH connection to Raspberry Pi
+3. Use VS Code extensions for Python development, SSH tunneling, and debugging
+4. Deploy Python scripts directly from VS Code to the Pi
+
+---
+
+## 📖 Additional Documentation
+
+Additional project files:
+
+- **cam_preview.py**: Python script to capture and preview camera frames from XIAO ESP32-S3 Sense over WiFi
+- **wifi_scan.cpp**: C++ program to scan available WiFi networks on ESP32
+- **ESP32_CAMERA_VIEWER_README.md**: Detailed documentation for ESP32 camera streaming
 
 ---
 

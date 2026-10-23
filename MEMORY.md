@@ -1,1 +1,0 @@
-- ESP32 Upload Issues & Fixes - PlatformIO/arduino-cli not installed, custom board XML created [[xiao-cam-board]], baud rate mismatch 115200 fixed in Python scripts
