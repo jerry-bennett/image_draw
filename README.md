@@ -142,7 +142,8 @@ Use the custom button you soldered to the Raspberry Pi:
 - **[XIAO ESP32-S3 Getting Started Guide](https://wiki.seeedstudio.com/xiao_esp32s3_getting_started/)** - Basic board setup, flashing firmware, and configuration
 - **[ESP32 Camera Guide](https://www.seeedstudio.com/blog/2026/05/06/esp32-camera-guide/)** - Camera module setup, MJPEG streaming, and frame capture
 - **[Waveshare Spectra6 E-Ink Display](https://www.waveshare.com/wiki/4inch_e-Paper_HAT+_(E))** - Official Waveshare documentation for display configuration and driver information
-- **[WiFi Information for XIAO ESP32S3](https://wiki.seeedstudio.com/xiao_esp32s3_wifi_usage/)
+- **[WiFi Information for XIAO ESP32S3](https://wiki.seeedstudio.com/xiao_esp32s3_wifi_usage/)**
+- **[Camera Usage for XIAO ESP32S3](https://wiki.seeedstudio.com/xiao_esp32s3_camera_usage/)**
 ### Waveshare Spectra6 E-Ink Display
 
 - **Waveshare Spectra6 Documentation** - Official Waveshare documentation for display configuration and driver information
