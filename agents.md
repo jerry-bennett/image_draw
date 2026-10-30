@@ -13,8 +13,8 @@ A hardware system that:
 
 | Component | Purpose | Notes |
 |-----------|---------|-------|
-| XIAO ESP32-S3 Sense | WiFi camera streaming + SD storage | OV5640 sensor, built-in PSRAM |
-| Raspberry Pi 3 | Frame conversion & E-Ink display | Runs Python scripts |
+| XIAO ESP32-S3 Sense | WiFi camera streaming | OV5640 sensor, built-in PSRAM |
+| Raspberry Pi 3 | Frame conversion & E-Ink display + SD Card | Runs Python scripts |
 | Waveshare Spectra6 E-Ink | 4" color e-ink display | SPI interface (SPI3) |
 | Custom Button | GPIO trigger | Connected to Pi GPIO 26 |
 
@@ -58,6 +58,7 @@ image_draw/
 - Takes photos every 60 seconds automatically
 - Saves directly to SD card
 - No Pi intervention needed
+- No SD card currently in XIAO, can change that if needed.
 
 ## 🔌 XIAO ESP32-S3 Camera Pins
 
@@ -205,6 +206,3 @@ Use these memory file patterns:
 - [ ] Support different camera resolutions via configuration option
 - [ ] Add JPEG quality setting in `esp32s3.ino`
 
----
-
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
