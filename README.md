@@ -21,13 +21,42 @@ This integrated system consists of three components working together:
 | XIAO ESP32-S3 Sense | WiFi-enabled ESP32 board with OV5640/OV3660 camera sensor |
 | Raspberry Pi 3 | Runs the camera capture and E-Ink display software |
 | Waveshare Spectra6 E-Ink Display | 4-inch color e-ink display (E Ink Color HAT) |
-| Custom Button | Soldered button on Pi to trigger photo capture |
+| Custom Button | GPIO-triggered button on Pi for manual photo capture |
 
 ---
 
 ## 📡 ESP32 Camera Stream
 
-Recently added the 'make_xiao_an_access_point.cpp file. This will be used in the future when the device is on the go, so the Raspberry Pi can connect to the XIAO's wifi.
+The XIAO ESP32-S3 Sense streams MJPEG video frames over HTTP. This can be used with the `cam_preview.py` Python script on the Pi, OR with a direct C++ sketch (like `esp32s3.ino`) that runs entirely on the ESP32 to capture photos and save directly to an SD card.
+
+**Recently added `make_xiao_an_access_point.cpp`. This will be used in the future when the device is on the go, so the Raspberry Pi can connect to the XIAO's WiFi.**
+
+---
+
+## 🔌 XIAO ESP32-S3 Camera Pin Definitions
+
+For your C++ sketches to work with the OV5640 expansion board, you'll need the correct GPIO pin definitions. The Seeed Wiki documentation provides these default pin mappings:
+
+| GPIO Number | Signal |
+|-------------|--------|
+| 10 (XMCLK) | XCLK |
+| 11 (DVP_Y8) | Y8 (D7) |
+| 12 (DVP_Y7) | Y7 (D6) |
+| 13 (DVP_PCLK) | PCLK (D5) |
+| 14 (DVP_Y6) | Y6 (D4) |
+| 15 (DVP_Y2) | Y2 (D3) |
+| 16 (DVP_Y5) | Y5 (D2) |
+| 17 (DVP_Y3) | Y3 (D1) |
+| 18 (DVP_Y4) | Y4 (D0) |
+| 38 (DVP_VSYNC) | VSYNC |
+| 39 (CAM_SCL) | SCL (I2C clock) |
+| 40 (CAM_SDA) | SDA (I2C data) |
+| 47 (DVP_HREF) | HREF |
+| 48 (DVP_Y9) | Y9 |
+
+**Note:** The ESP32-S3 has PSRAM built-in, which is important for camera buffer operations. You'll need to include `camera_pins.h` in your sketches with these definitions.
+
+---
 
 The XIAO ESP32-S3 Sense streams MJPEG video frames over HTTP at the following endpoint:
 
@@ -58,7 +87,7 @@ The Raspberry Pi runs a Python script that:
 
 ### Prerequisites
 
-#### Raspberry Pi OS Packages
+#### Raspberry Pi OS Packages (For Python Script)
 
 ```bash
 # Install required packages
@@ -67,38 +96,80 @@ sudo apt install -y rpi-camera libjpeg-dev python3-pip
 pip3 install opencv-python Pillow scapy requests
 ```
 
-#### Camera Interface Setup
+#### Camera Interface Setup (E-Ink Display)
 
-Connect the Spectra6 E-Ink display to the Pi. Configure the Raspberry Pi Camera module to use your E-Ink display interface:
+Connect the Spectra6 E-Ink display to the Pi using SPI. Configure the Raspberry Pi to use your E-Ink interface:
 
 ```bash
 # Set up camera interface (adjust for your display configuration)
 sudo nano /boot/config.txt
 ```
 
-Add or modify lines as needed for your E-Ink HAT connection. Common settings include:
+Add or modify lines for your E-Ink HAT. For Waveshare Spectra6 E-Paper:
 
-```
+```ini
 # Waveshare Spectra6 E-Ink Display settings
-# Replace with your actual display settings
 dtoverlay=spi3-hd430pga5a-8bit=2,0=hdmi_cvt
 ```
 
-**Note:** The specific configuration depends on your display's GPIO pin mapping. Check Waveshare documentation or identify pins using the camera config tool.
+**Note:** Specific configuration depends on your display's GPIO pin mapping. Check Waveshare documentation or use the camera config tool.
+
+---
+
+## 🔌 ESP32 Button Trigger (Alternative to Pi Button)
+
+The `esp32s3.ino` sketch can be configured to take photos when a button on the **ESP32 board** is pressed, eliminating the need for any Python script on the Pi. To enable this:
+
+1. Connect a GPIO interrupt pin on the ESP32 to a button (e.g., GPIO 21 / PULLUP)
+2. Include `esp_camera.h`, `FS.h`, `SD.h`, and `SPI.h` in your sketch
+3. Add SPI and SD card setup for saving directly to SD
+
+See the Seeed Wiki's **"Project I: Making a handheld camera"** for an example of taking photos via touch input on the XIAO's round display.
+
+---
+
+---
+
+## 📷 ESP32 Camera Sketches
+
+### xiao_take_photo.cpp - Auto-Capture Mode
+
+This sketch (`esp32s3.ino`) takes photos automatically every 60 seconds and saves them directly to an SD card. No Python script on the Pi is needed for this mode.
+
+Key features:
+- Automatic photo capture every minute
+- Direct SD card storage (no conversion needed)
+- OV5640 auto-focus support for sharper images
+- Full camera pin configuration for XIAO ESP32-S3
+
+### ESP32 Button Trigger (Alternative to Pi Button)
+
+The `esp32s3.ino` sketch can be configured to take photos when a button on the **ESP32 board** is pressed, eliminating the need for any Python script on the Pi. To enable this:
+
+1. Connect a GPIO interrupt pin on the ESP32 to a button (e.g., GPIO 21 / PULLUP)
+2. Include `esp_camera.h`, `FS.h`, `SD.h`, and `SPI.h` in your sketch
+3. Add SPI and SD card setup for saving directly to SD
+4. Use the button pin number when configuring your camera
+
+See the Seeed Wiki's **"Project I: Making a handheld camera"** for an example of taking photos via touch input on the XIAO's round display.
 
 ---
 
 ## 🎮 How to Take a Photo
 
-Use the custom button you soldered to the Raspberry Pi:
+Use the custom button soldered to the Raspberry Pi:
 
 1. Ensure ESP32 is connected to WiFi and streaming
 2. Verify the camera stream endpoint works (e.g., from another device):
-   ```
+   ```bash
    http://<ESP32_IP>:8080/stream.txt
    ```
 3. Press your custom button on the Raspberry Pi
 4. The script captures a frame, converts to BMP, and displays it on the E-Ink screen
+
+### Option B: Auto-Capture (Every 60 seconds)
+
+The `esp32s3.ino` sketch automatically takes photos once every minute and saves them directly to the SD card (no Pi intervention needed). This is ideal for "set-and-forget" operation.
 
 ---
 
@@ -143,7 +214,7 @@ Use the custom button you soldered to the Raspberry Pi:
 - **[ESP32 Camera Guide](https://www.seeedstudio.com/blog/2026/05/06/esp32-camera-guide/)** - Camera module setup, MJPEG streaming, and frame capture
 - **[Waveshare Spectra6 E-Ink Display](https://www.waveshare.com/wiki/4inch_e-Paper_HAT+_(E))** - Official Waveshare documentation for display configuration and driver information
 - **[WiFi Information for XIAO ESP32S3](https://wiki.seeedstudio.com/xiao_esp32s3_wifi_usage/)**
-- **[Camera Usage for XIAO ESP32S3](https://wiki.seeedstudio.com/xiao_esp32s3_camera_usage/)**
+- **[Camera Usage for XIAO ESP32S3](https://wiki.seeedstudio.com/xiao_esp32s3_camera_usage/)** - Photo capture and SD card writing
 ### Waveshare Spectra6 E-Ink Display
 
 - **Waveshare Spectra6 Documentation** - Official Waveshare documentation for display configuration and driver information
