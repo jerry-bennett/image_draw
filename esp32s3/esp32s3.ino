@@ -2,6 +2,8 @@
 #include "FS.h"
 #include "SD.h"
 #include "SPI.h"
+#include <WiFi.h>
+#include <WiFiServer.h>
 
 #define CAMERA_MODEL_XIAO_ESP32S3 // Has PSRAM
 
@@ -10,17 +12,36 @@
 
 OV5640 ov5640 = OV5640();
 
-#define OV5640_AF_FOCUS_FRAMESIZE FRAMESIZE_SXGA // AF focusing requires >=1280x1024
-#define OV5640_FOCUS_TIMEOUT_MS  8000
+// WiFi server for TCP/IP signaling from Pi button
+WiFiServer server(8080);
+bool tcp_capture_request_received = false;
 
-unsigned long lastCaptureTime = 0; // Last shooting time
-int imageCount = 1;                // File Counter
-bool camera_sign = false;          // Check camera status
-bool sd_sign = false;              // Check sd status
+// Handle TCP/IP capture request from Pi button
+void handleCaptureRequest() {
+  tcp_capture_request_received = false;
+  Serial.println("\n--- Capture Request Received via WiFi ---");
+
+  // Take a photo (directly, no stream needed when triggered)
+  camera_fb_t *fb = esp_camera_fb_get();
+  if (!fb) {
+    Serial.println("Failed to get camera frame buffer");
+    return;
+  }
+
+  // Save photo to SD card immediately
+  char filename[32];
+  sprintf(filename, "/image%d.jpg", imageCount);
+  writeFile(SD, filename, fb->buf, fb->len);
+
+  // Release image buffer
+  esp_camera_fb_return(fb);
+
+  Serial.printf("Photo saved: %s\n", filename);
+}
 
 // Save pictures to SD card
 void photo_save(const char * fileName) {
-  // Take a photo
+  // Take a photo (for auto-capture mode)
   camera_fb_t *fb = esp_camera_fb_get();
   if (!fb) {
     Serial.println("Failed to get camera frame buffer");
@@ -28,7 +49,7 @@ void photo_save(const char * fileName) {
   }
   // Save photo to file
   writeFile(SD, fileName, fb->buf, fb->len);
-  
+
   // Release image buffer
   esp_camera_fb_return(fb);
 
@@ -73,6 +94,11 @@ void setup() {
   Serial.begin(115200);
   while(!Serial); // When the serial monitor is turned on, the program starts to execute
 
+  // Initialize WiFi for TCP/IP signaling from Pi button
+  Serial.println("Initializing WiFi server on port 8080...");
+  WiFi.mode(WIFI_STA);
+  tcp_capture_request_received = false;
+
   camera_config_t config;
   config.ledc_channel = LEDC_CHANNEL_0;
   config.ledc_timer = LEDC_TIMER_0;
@@ -99,7 +125,7 @@ void setup() {
   config.fb_location = CAMERA_FB_IN_PSRAM;
   config.jpeg_quality = 12;
   config.fb_count = 1;
-  
+
   // if PSRAM IC present, init with UXGA resolution and higher JPEG quality
   //                      for larger pre-allocated frame buffer.
   if(config.pixel_format == PIXFORMAT_JPEG){
@@ -126,7 +152,7 @@ void setup() {
     Serial.printf("Camera init failed with error 0x%x", err);
     return;
   }
-  
+
   camera_sign = true; // Camera initialization check passes
 
   // --- OV5640 auto-focus init (a key step missing from factory firmware; without it the lens defaults out of focus) ---
@@ -154,6 +180,14 @@ void setup() {
       }
     }
   }
+
+  // Initialize WiFi server for TCP/IP signaling from Pi button
+  Serial.println("Setting up WiFi TCP server...");
+  IPAddress pi_ip(192, 168, 4, 1); // Default ESP32 AP IP (adjust based on your network)
+  server.begin();
+  Serial.print("WiFi server listening for capture requests at http://");
+  Serial.print(WiFi.localIP());
+  Serial.println(":8080/capture");
 
   // Initialize SD card
   if(!SD.begin(21)){
@@ -184,12 +218,33 @@ void setup() {
   Serial.println("Photos will begin in one minute, please be ready.");
 }
 
+// Handle WiFi TCP requests from Pi button
+bool handleTcpServer() {
+  if (!tcp_capture_request_received) return false;
+
+  // Read incoming data from TCP connection
+  while (server.available()) {
+    char request = (char)server.read();
+
+    // Look for "CAPTURE" keyword in HTTP request
+    if (request == 'C' || request == 'A' || request == 'P' ||
+        request == 'T' || request == 'U' || request == 'R' || request == 'E') {
+      tcp_capture_request_received = true;
+    }
+  }
+
+  return true;
+}
+
 void loop() {
+  // Handle WiFi TCP requests from Pi button
+  handleTcpServer();
+
   // Camera & SD available, start taking pictures
   if(camera_sign && sd_sign){
     // Get the current time
     unsigned long now = millis();
-  
+
     //If it has been more than 1 minute since the last shot, take a picture and save it to the SD card
     if ((now - lastCaptureTime) >= 60000) {
       char filename[32];
@@ -201,4 +256,7 @@ void loop() {
       lastCaptureTime = now;
     }
   }
+
+  // Drain any remaining TCP data after processing
+  handleTcpServer();
 }
