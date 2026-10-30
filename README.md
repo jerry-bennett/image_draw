@@ -118,13 +118,27 @@ dtoverlay=spi3-hd430pga5a-8bit=2,0=hdmi_cvt
 
 ## 🔌 ESP32 Button Trigger (Alternative to Pi Button)
 
-The `esp32s3.ino` sketch can be configured to take photos when a button on the **ESP32 board** is pressed, eliminating the need for any Python script on the Pi. To enable this:
-
-1. Connect a GPIO interrupt pin on the ESP32 to a button (e.g., GPIO 21 / PULLUP)
-2. Include `esp_camera.h`, `FS.h`, `SD.h`, and `SPI.h` in your sketch
-3. Add SPI and SD card setup for saving directly to SD
+The `esp32s3.ino` sketch can be configured to take photos when a button on the **ESP32 board** is pressed. This option allows you to run the camera/SD code entirely on the ESP32 with no Python script on the Pi needed.
 
 See the Seeed Wiki's **"Project I: Making a handheld camera"** for an example of taking photos via touch input on the XIAO's round display.
+
+---
+
+## 🔌 Pi Button Signal to ESP32 (Current Setup)
+
+If you have a **button soldered directly to the Raspberry Pi** (not ESP32), you'll need to signal the ESP32 to take a photo over WiFi using one of these methods:
+
+### Option A: TCP/IP Signaling (Recommended)
+1. Connect a GPIO button pin on the Pi to trigger the script
+2. The Python script connects to the ESP32 via WiFi and sends a capture command
+3. ESP32 receives signal, takes photo, saves to SD card
+
+### Option B: Serial Over WiFi (TCP Server)
+1. ESP32 acts as an HTTP server at `http://<ESP32_IP>:8080/capture`
+2. Pi button press triggers Python script which sends HTTP POST request
+3. ESP32 captures photo on receiving signal
+
+The **esp32s3.ino** sketch supports both approaches and can be extended to receive the TCP signal via WiFi network.
 
 ---
 
@@ -142,7 +156,7 @@ Key features:
 - OV5640 auto-focus support for sharper images
 - Full camera pin configuration for XIAO ESP32-S3
 
-### ESP32 Button Trigger (Alternative to Pi Button)
+## 🔌 ESP32 Button Trigger (Alternative to Pi Button)
 
 The `esp32s3.ino` sketch can be configured to take photos when a button on the **ESP32 board** is pressed, eliminating the need for any Python script on the Pi. To enable this:
 
@@ -155,9 +169,34 @@ See the Seeed Wiki's **"Project I: Making a handheld camera"** for an example of
 
 ---
 
+## 🔌 Pi → ESP32 Communication (Optional Extension)
+
+To extend this setup to let the **ESP32** take photos directly (rather than displaying stream frames):
+
+1. Modify `esp32s3.ino` to listen for TCP/IP signals via WiFi
+2. When a signal arrives, the ESP32 takes a photo and saves to SD card
+3. Optionally remove auto-capture timer from `esp32s3.ino`
+
+---
+
+
+## 📷 button_trigger.py Behavior
+
+The Python script on Pi monitors GPIO 26 button with two actions:
+
+| Action | Script Triggered | Effect |
+|--------|-----------------|--------|
+| **Double-click** | `/image_draw/clear.py` | Clears E-Ink display |
+| **3-second hold** | `/image_draw/image_draw.py` | Captures frame from ESP32 stream |
+
+---
+
+
 ## 🎮 How to Take a Photo
 
-Use the custom button soldered to the Raspberry Pi:
+### Option A: Pi Button Trigger (Current Setup with button_trigger.py)
+
+Use the custom button soldered to the Raspberry Pi (GPIO 26 / BCM Pin 37):
 
 1. Ensure ESP32 is connected to WiFi and streaming
 2. Verify the camera stream endpoint works (e.g., from another device):
@@ -165,11 +204,12 @@ Use the custom button soldered to the Raspberry Pi:
    http://<ESP32_IP>:8080/stream.txt
    ```
 3. Press your custom button on the Raspberry Pi
-4. The script captures a frame, converts to BMP, and displays it on the E-Ink screen
+4. `button_trigger.py` detects 3-second hold and runs `/image_draw/image_draw.py`
+5. Script captures frame from ESP32 stream, converts to BMP, displays on E-Ink screen
 
-### Option B: Auto-Capture (Every 60 seconds)
+### Option B: Auto-Capture (ESP32 Direct - Every 60 seconds)
 
-The `esp32s3.ino` sketch automatically takes photos once every minute and saves them directly to the SD card (no Pi intervention needed). This is ideal for "set-and-forget" operation.
+The `esp32s3.ino` sketch automatically takes photos once every minute and saves them directly to the SD card on ESP32. No Python script on Pi is needed for this mode. This is ideal for "set-and-forget" operation with handheld camera use.
 
 ---
 
