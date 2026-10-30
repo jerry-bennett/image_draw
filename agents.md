@@ -8,6 +8,7 @@ A hardware system that:
 1. Captures photos from XIAO ESP32-S3 Sense camera over WiFi
 2. Converts JPEG frames to BMP format on the Pi
 3. Displays images on Waveshare Spectra6 4" E-Ink display
+4. Saves the BMP file onto a micro SD card on the Pi.
 
 ## 🔧 Hardware Components
 
@@ -137,6 +138,79 @@ To enable ESP32 photo capture triggered by Pi button signals:
 | XIAO ESP32-S3 | Arduino IDE | Flash C++ sketches, serial monitor |
 | Raspberry Pi 3 | VS Code (SSH) | Python script development |
 
+## Architecture decisions (`adr/`)
+
+The [`adr/`](./adr/) directory is the architecture overview + decision log. Keep it
+current as part of the work, not as an afterthought:
+
+- **Made a significant architectural decision** (auth model, schema boundary, deployment
+  shape, a new service or major dependency, superseding a past choice)? Add a new record
+  `adr/NNNN-title-in-kebab-case.md` using the format of
+  [ADR 0001](./adr/0001-record-architecture-decisions.md) — Status / Context / Decision /
+  Consequences — and add a row to the decision-log table in
+  [`adr/README.md`](./adr/README.md). To supersede an earlier decision, add a new ADR and
+  flip the old one's status to `Superseded`.
+- **Changed the architecture or directory layout** that the overview in `adr/README.md`
+  describes (new app, new top-level dir, moved component)? Update that overview/diagram in
+  the same change so it stays accurate.
+- The bar is *significant* decisions, not every change — don't manufacture ADRs for
+  routine work.
+- **An ADR is plain Markdown with no external links**: no docs elsewhere. Summarise what a link would have said in the ADR
+  itself, so an agent reading `adr/` alone has the whole context. Links to other
+  files in this repo are fine.
+
+## PR hygiene
+
+- Keep PRs under 400 lines changed, one concern per PR. If a change is larger, flag it and suggest splitting before creating the PR.
+- Self-review the diff before opening the PR — catch obvious issues before requesting a human review.
+- Fill out the PR body using the template: what changed, why, and how to test.
+- If the user mentions a GitHub issue, include `Closes #<number>` in the PR body so it auto-closes on merge.
+- Always open PRs as drafts (`gh pr create --draft`); let a human mark them ready for review.
+
+
+## Branch naming
+
+Use lowercase, hyphenated branch names in the format `type/short-desc`:
+
+| Prefix | When to use |
+|--------|-------------|
+| `feature/` | New functionality that didn't exist before |
+| `fix/` | Correcting broken or incorrect behavior |
+| `chore/` | Deps, config, CI, refactor, tooling — no functional change |
+| `docs/` | READMEs, ADRs, comments only — no code change |
+
+**One branch can cover several issues.** Sub-issues each get their own identifier, so
+the default is one branch per issue — but small related sub-issues don't need splitting.
+Name the branch after the parent (`chore/...`) and list the rest in the PR body;
+
+**Classifying the type** — key off the user's words, not just the files touched:
+- "add", "build", "implement", "new" → `feature/`
+- "bug", "broken", "wrong", "not working", "handle error" → `fix/`
+- "bump", "upgrade", "rename", "refactor", "config", "CI" → `chore/`
+- Only docs files touched → `docs/`
+- **When in doubt, ask** — if the user's description doesn't clearly map to a type, confirm before creating the branch.
+
+**Mixed-type changes** — if a change spans more than one type with no clear dominant intent, that's a signal the work should be split into separate branches. Flag this to the user and ask which piece to tackle first. If the user wants it in one branch, ask them to name the type rather than guessing.
+
+## Commit message format
+
+Use Conventional Commits: `type(scope): message`
+
+Types: `feat` | `fix` | `chore` | `refactor` | `docs` | `test`
+
+Scope is optional but encouraged — e.g. `feat(api)`, `fix(auth)`, `chore(tf)`, `refactor(web)`.
+
+- Imperative mood, present tense: "add X" not "added X"
+- Subject line under 72 characters
+- If more context is needed, leave a blank line after the subject and write a body
+
+When you commit
+
+Commit or push only when asked. Ask whether to land on `main` or a new branch rather than
+deciding yourself. **Open PRs as drafts** (`gh pr create --draft`) and let a human mark them
+ready for review — this prevents accidental merges.
+
+- Use the same type classification rules as [Branch naming](#branch-naming) — the vocabulary heuristics and "when in doubt, ask" rule apply here too.
 ## ⚙️ Troubleshooting
 
 ### ESP32 Connection Issues
