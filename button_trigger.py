@@ -5,8 +5,8 @@ from gpiozero import Button
 from signal import pause
 
 # ESP32 WiFi server endpoint for TCP/IP signaling
-ESP32_STREAM_URL = "http://192.168.4.1:8080/stream.txt"  # Use your ESP32's actual IP when connected to AP
-ESP32_CAPTURE_ENDPOINT = "http://192.168.4.1:8080/capture"
+ESP32_STREAM_URL = "http://192.168.12.228/stream.txt"  
+ESP32_CAPTURE_ENDPOINT = "http://192.168.12.228/capture"
 
 # Set up button on BCM 26 (Physical Pin 37)
 # hold_time=3.0 configures when held_time triggers

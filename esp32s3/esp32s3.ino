@@ -1,14 +1,24 @@
-#include "esp_camera.h"
-#include "FS.h"
-#include "SD.h"
-#include "SPI.h"
-#include <WiFi.h>
-#include <WiFiServer.h>
+#include <Arduino.h>          // Core Arduino API for ESP32-S3 Sense
+#include <WiFi.h>              // WiFi client (not server mode)
+#include <SPI.h>               // SPI support
+
+// Note: Using esp_camera.h and SD.h from ESP32 Arduino core
+// They should be installed via Board Manager, not as files
 
 #define CAMERA_MODEL_XIAO_ESP32S3 // Has PSRAM
 
 #include "camera_pins.h"
-#include "ESP32_OV5640_AF.h"   // OV5640 auto-focus library (github.com/0015/ESP32-OV5640-AF)
+#include "ESP32_OV5640_AF.h"   // OV5640 auto-focus library
+
+// WiFi Client connection (not server)
+WiFiClient client;
+
+// Global variables
+uint8_t imageCount = 0;
+bool tcp_capture_request_received = false;
+bool camera_sign = true;    // Camera initialization check passes
+bool sd_sign = true;        // SD initialization check passes
+unsigned long lastCaptureTime = 0;
 
 OV5640 ov5640 = OV5640();
 
@@ -95,9 +105,19 @@ void setup() {
   while(!Serial); // When the serial monitor is turned on, the program starts to execute
 
   // Initialize WiFi for TCP/IP signaling from Pi button
-  Serial.println("Initializing WiFi server on port 8080...");
-  WiFi.mode(WIFI_STA);
+  Serial.println("Initializing WiFi client connection to network 'dangus'...");
+  WiFi.begin("dangus", "eraserhead");
   tcp_capture_request_received = false;
+
+  // Wait for WiFi connection
+  int attempt = 0;
+  while (WiFi.status() != WL_CONNECTED && attempt < 60) {
+    delay(500);
+    Serial.print(".");
+    attempt++;
+  }
+  Serial.println();
+  Serial.println("WiFi connected!");
 
   camera_config_t config;
   config.ledc_channel = LEDC_CHANNEL_0;
@@ -181,13 +201,25 @@ void setup() {
     }
   }
 
-  // Initialize WiFi server for TCP/IP signaling from Pi button
-  Serial.println("Setting up WiFi TCP server...");
-  IPAddress pi_ip(192, 168, 4, 1); // Default ESP32 AP IP (adjust based on your network)
-  server.begin();
-  Serial.print("WiFi server listening for capture requests at http://");
-  Serial.print(WiFi.localIP());
-  Serial.println(":8080/capture");
+  // Initialize WiFi Client for TCP/IP signaling from Pi button
+  Serial.println("Connecting to WiFi 'dangus'...");
+
+  // Connect to WiFi client mode (NOT server mode - we don't host AP)
+  WiFi.begin("dangus", "eraserhead");
+
+  // Wait for connection
+  int attempt = 0;
+  while (WiFi.status() != WL_CONNECTED && attempt < 120) {
+    delay(500);
+    Serial.print(".");
+    attempt++;
+  }
+  Serial.println();
+  Serial.println("WiFi connected!");
+
+  // Get local IP address
+  Serial.print("ESP32 IP: ");
+  Serial.println(WiFi.localIP());
 
   // Initialize SD card
   if(!SD.begin(21)){
@@ -218,22 +250,21 @@ void setup() {
   Serial.println("Photos will begin in one minute, please be ready.");
 }
 
-// Handle WiFi TCP requests from Pi button
+// Handle WiFi TCP requests from Pi button using regular client
 bool handleTcpServer() {
   if (!tcp_capture_request_received) return false;
 
   // Read incoming data from TCP connection
-  while (server.available()) {
-    char request = (char)server.read();
+  char request = (char)client.read();
 
-    // Look for "CAPTURE" keyword in HTTP request
-    if (request == 'C' || request == 'A' || request == 'P' ||
-        request == 'T' || request == 'U' || request == 'R' || request == 'E') {
-      tcp_capture_request_received = true;
-    }
+  // Look for "CAPTURE" keyword in HTTP request
+  if (request == 'C' || request == 'A' || request == 'P' ||
+      request == 'T' || request == 'U' || request == 'R' || request == 'E') {
+    tcp_capture_request_received = true;
+    return true;
   }
 
-  return true;
+  return false;
 }
 
 void loop() {

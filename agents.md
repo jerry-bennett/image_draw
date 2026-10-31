@@ -105,21 +105,53 @@ pip3 install opencv-python Pillow scapy requests
 
 ## 📡 ESP32 Camera Stream Endpoint
 
-When ESP32 is streaming MJPEG frames:
+When ESP32 is streaming MJPEG frames (continuous mode):
 ```
 http://<ESP32_IP>:8080/stream.txt
 ```
 
-### ESP32 Setup Options
+### ESP32 WiFi Setup Options
 
-**Option A: WiFi Network Mode (Requires Pi to connect to ESP32)**
-- Connect ESP32 to home WiFi first
-- Get IP from `ipconfig /all` on Windows
+**Option A: WiFi Client Mode (Recommended)**
+- Connect ESP32 to home WiFi network (`SSID`, `PW`)
+- ESP32 gets IP via DHCP
+- Uses Wi-Fi client mode for receiving signals from Pi
 
 **Option B: Access Point Mode (For standalone use)**
 - Default SSID: `XIAO_ESP32S3_Sense`
 - Default Password: `seeedstudio`
 - AP IP: Usually `192.168.4.1`
+- Requires Pi to connect to ESP32's network
+
+**WiFi Client Mode Example in `esp32s3.ino`:**
+```cpp
+WiFi.begin("dangus", "eraserhead");
+// Wait for connection
+while (WiFi.status() != WL_CONNECTED) { delay(500); }
+Serial.println("WiFi connected!");
+```
+
+---
+
+## 🔌 Pi → ESP32 Communication
+
+To enable ESP32 photo capture triggered by Pi button signals:
+
+### TCP/IP Signaling (Recommended)
+
+1. Modify `esp32s3.ino` to listen for TCP/IP signals via WiFi client mode
+2. Configure Pi to run `button_trigger.py` script
+3. Get both devices' actual IP addresses (not default AP address)
+4. Update URLs in `button_trigger.py`:
+   ```python
+   ESP32_CAPTURE_ENDPOINT = "http://<ESP32_IP>:8080/capture"
+   ```
+5. Pi button press triggers Python script → sends signal to ESP32
+6. ESP32 receives signal, takes photo, saves to SD
+
+**Getting Device IPs:**
+- **ESP32**: View via Serial Monitor in Arduino IDE (shows `WiFi.localIP`)
+- **Pi**: Use `ip a` or check your network manager
 
 ## 🔌 Pi → ESP32 Communication
 
