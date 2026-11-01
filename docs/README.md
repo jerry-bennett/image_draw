@@ -17,8 +17,8 @@ This integrated system consists of three components working together:
 ## 🔧 Hardware Components
 
 | Component | Description |
-|-----------|-------------|
-| XIAO ESP32-S3 Sense | WiFi-enabled ESP32 board with OV5640/OV3660 camera sensor |
+|-----------|---------|
+| XIAO ESP32-S3 Sense | WiFi-enabled ESP32 board with OV5640/OV3660 camera sensor, PSRAM built-in |
 | Raspberry Pi 3 | Runs the camera capture and E-Ink display software |
 | Waveshare Spectra6 E-Ink Display | 4-inch color e-ink display (E Ink Color HAT) |
 | Custom Button | GPIO-triggered button on Pi for manual photo capture |
@@ -29,51 +29,20 @@ This integrated system consists of three components working together:
 
 The XIAO ESP32-S3 Sense streams MJPEG video frames over HTTP. This can be used with the `cam_preview.py` Python script on the Pi, OR with a direct C++ sketch (like `esp32s3.ino`) that runs entirely on the ESP32 to capture photos and save directly to an SD card.
 
-**Recently added `make_xiao_an_access_point.cpp`. This will be used in the future when the device is on the go, so the Raspberry Pi can connect to the XIAO's WiFi.**
-
----
-
-## 🔌 XIAO ESP32-S3 Camera Pin Definitions
-
-For your C++ sketches to work with the OV5640 expansion board, you'll need the correct GPIO pin definitions. The Seeed Wiki documentation provides these default pin mappings:
-
-| GPIO Number | Signal |
-|-------------|--------|
-| 10 (XMCLK) | XCLK |
-| 11 (DVP_Y8) | Y8 (D7) |
-| 12 (DVP_Y7) | Y7 (D6) |
-| 13 (DVP_PCLK) | PCLK (D5) |
-| 14 (DVP_Y6) | Y6 (D4) |
-| 15 (DVP_Y2) | Y2 (D3) |
-| 16 (DVP_Y5) | Y5 (D2) |
-| 17 (DVP_Y3) | Y3 (D1) |
-| 18 (DVP_Y4) | Y4 (D0) |
-| 38 (DVP_VSYNC) | VSYNC |
-| 39 (CAM_SCL) | SCL (I2C clock) |
-| 40 (CAM_SDA) | SDA (I2C data) |
-| 47 (DVP_HREF) | HREF |
-| 48 (DVP_Y9) | Y9 |
-
-**Note:** The ESP32-S3 has PSRAM built-in, which is important for camera buffer operations. You'll need to include `camera_pins.h` in your sketches with these definitions.
-
----
-
-The XIAO ESP32-S3 Sense streams MJPEG video frames over HTTP at the following endpoint:
-
-```
-http://<ESP32_IP_ADDRESS>:8080/stream.txt
-```
+**Recently added `esp32_tcp_server.ino`. This allows TCP/IP signaling from the Pi to trigger photo captures.**
 
 ### ESP32 Setup Options
 
-**Option A: WiFi Network (Recommended)**
-- Connect ESP32 to your home WiFi network first
-- Capture IP address from `ipconfig /all` on Windows
+**Option A: WiFi Client Mode (Recommended for TCP signaling)**
+- Connect ESP32 to home WiFi network (`SSID`, `PW`)
+- ESP32 gets IP via DHCP
+- Uses Wi-Fi client mode for receiving signals from Pi
+- Example credentials: `WiFi.begin("dangus", "eraserhead")`
 
-**Option B: Access Point Mode**
+**Option B: Access Point Mode (For standalone use)**
 - Default SSID: `XIAO_ESP32S3_Sense`
 - Default Password: `seeedstudio`
-- Access point IP: Usually `192.168.4.1` (configurable)
+- AP IP: Usually `192.168.4.1` (configurable)
 
 ---
 
@@ -116,69 +85,37 @@ dtoverlay=spi3-hd430pga5a-8bit=2,0=hdmi_cvt
 
 ---
 
-## 🔌 ESP32 Button Trigger (Alternative to Pi Button)
+## 🔌 Pi → ESP32 Communication (TCP/IP Signaling)
 
-The `esp32s3.ino` sketch can be configured to take photos when a button on the **ESP32 board** is pressed. This option allows you to run the camera/SD code entirely on the ESP32 with no Python script on the Pi needed.
+To enable **ESP32** photo capture triggered by Pi button signals:
 
-See the Seeed Wiki's **"Project I: Making a handheld camera"** for an example of taking photos via touch input on the XIAO's round display.
+1. Connect ESP32 to home WiFi (`WiFi.begin("dangus", "eraserhead")`)
+2. Configure Pi `button_trigger.py` script with correct IP
+3. Verify both devices on **same network** for TCP communication
+4. Update URLs in `button_trigger.py`:
+   ```python
+   ESP32_CAPTURE_ENDPOINT = "http://<ESP32_IP>:80/capture"  # Actual IPs!
+   ```
 
----
+5. Pi button press (hold 3s) triggers Python script → sends signal to ESP32
+6. ESP32 receives signal via WiFi client mode, takes photo, saves to SD
 
-## 🔌 Pi Button Signal to ESP32 (Current Setup)
+**Critical Requirement:** Both ESP32 and Pi must connect to the **same WiFi network**. The current configuration shows:
+- ESP32 Client IP: `192.168.12.228` (from Serial Monitor)
+- Pi IP: `192.168.12.106`
 
-If you have a **button soldered directly to the Raspberry Pi** (not ESP32), you'll need to signal the ESP32 to take a photo over WiFi using one of these methods:
+**Getting Device IPs:**
+- **ESP32**: View via Serial Monitor in Arduino IDE (shows `WiFi.localIP`)
+- **Pi**: Use `ip a` or check `/boot/config.txt` for network configuration
 
-### Option A: TCP/IP Signaling (Recommended)
-1. Connect a GPIO button pin on the Pi to trigger the script
-2. The Python script connects to the ESP32 via WiFi and sends a capture command
-3. ESP32 receives signal, takes photo, saves to SD card
+### Troubleshooting TCP Connection Issues
 
-### Option B: Serial Over WiFi (TCP Server)
-1. ESP32 acts as an HTTP server at `http://<ESP32_IP>:8080/capture`
-2. Pi button press triggers Python script which sends HTTP POST request
-3. ESP32 captures photo on receiving signal
-
-The **esp32s3.ino** sketch supports both approaches and can be extended to receive the TCP signal via WiFi network.
-
----
-
----
-
-## 📷 ESP32 Camera Sketches
-
-### xiao_take_photo.cpp - Auto-Capture Mode
-
-This sketch (`esp32s3.ino`) takes photos automatically every 60 seconds and saves them directly to an SD card. No Python script on the Pi is needed for this mode.
-
-Key features:
-- Automatic photo capture every minute
-- Direct SD card storage (no conversion needed)
-- OV5640 auto-focus support for sharper images
-- Full camera pin configuration for XIAO ESP32-S3
-
-## 🔌 ESP32 Button Trigger (Alternative to Pi Button)
-
-The `esp32s3.ino` sketch can be configured to take photos when a button on the **ESP32 board** is pressed, eliminating the need for any Python script on the Pi. To enable this:
-
-1. Connect a GPIO interrupt pin on the ESP32 to a button (e.g., GPIO 21 / PULLUP)
-2. Include `esp_camera.h`, `FS.h`, `SD.h`, and `SPI.h` in your sketch
-3. Add SPI and SD card setup for saving directly to SD
-4. Use the button pin number when configuring your camera
-
-See the Seeed Wiki's **"Project I: Making a handheld camera"** for an example of taking photos via touch input on the XIAO's round display.
+| Symptom | Cause | Solution |
+|---------|-------|----------|
+| "Connection refused" | Wrong IP/Port in `button_trigger.py` | Update with actual ESP32 IP from Serial output |
+| No connection at all | Router blocking inter-device traffic | Ensure both on same subnet, check firewall |
 
 ---
-
-## 🔌 Pi → ESP32 Communication (Optional Extension)
-
-To extend this setup to let the **ESP32** take photos directly (rather than displaying stream frames):
-
-1. Modify `esp32s3.ino` to listen for TCP/IP signals via WiFi
-2. When a signal arrives, the ESP32 takes a photo and saves to SD card
-3. Optionally remove auto-capture timer from `esp32s3.ino`
-
----
-
 
 ## 📷 button_trigger.py Behavior
 
@@ -191,25 +128,22 @@ The Python script on Pi monitors GPIO 26 button with two actions:
 
 ---
 
+## 📷 button_trigger.py Behavior (ESP32 Capture Mode)
 
-## 🎮 How to Take a Photo
+When using `esp32_tcp_server.ino`:
 
-### Option A: Pi Button Trigger (Current Setup with button_trigger.py)
+| Action | Signal Sent | Effect |
+|--------|-------------|--------|
+| **Double-click** | TCP signal to ESP32 | ESP32 takes photo, saves to SD |
+| **3-second hold** | Same as above + Pi display capture | Both ESP32 and Pi capture simultaneously |
 
-Use the custom button soldered to the Raspberry Pi (GPIO 26 / BCM Pin 37):
+---
 
-1. Ensure ESP32 is connected to WiFi and streaming
-2. Verify the camera stream endpoint works (e.g., from another device):
-   ```bash
-   http://<ESP32_IP>:8080/stream.txt
-   ```
-3. Press your custom button on the Raspberry Pi
-4. `button_trigger.py` detects 3-second hold and runs `/image_draw/image_draw.py`
-5. Script captures frame from ESP32 stream, converts to BMP, displays on E-Ink screen
+## 📷 ESP32 Button Trigger (Alternative)
 
-### Option B: Auto-Capture (ESP32 Direct - Every 60 seconds)
+The `esp32s3.ino` sketch can be configured to take photos when a button on the **ESP32 board** is pressed. This option allows you to run the camera/SD code entirely on the ESP32 with no Python script on the Pi needed.
 
-The `esp32s3.ino` sketch automatically takes photos once every minute and saves them directly to the SD card on ESP32. No Python script on Pi is needed for this mode. This is ideal for "set-and-forget" operation with handheld camera use.
+See the Seeed Wiki's **"Project I: Making a handheld camera"** for an example of taking photos via touch input on the XIAO's round display.
 
 ---
 
@@ -227,9 +161,10 @@ The `esp32s3.ino` sketch automatically takes photos once every minute and saves 
 
 | Issue | Solution |
 |-------|----------|
-| ESP32 won't connect to WiFi | Reboot ESP32, try default AP credentials |
+| ESP32 won't connect to WiFi | Reboot ESP32, try default AP credentials or check WiFi password |
 | No stream at `http://<ESP32_IP>:8080/stream.txt` | Verify camera firmware is running (check LED status) |
 | Camera stream shows "CAMERA" or similar error | Check ESP32 console output in serial monitor |
+| TCP connection fails | Ensure both devices on same subnet, check `esp32_tcp_server.ino` for proper WiFi config |
 
 ### Raspberry Pi Display Issues?
 
@@ -243,6 +178,7 @@ The `esp32s3.ino` sketch automatically takes photos once every minute and saves 
 - **ESP32 Camera disabled**: Reboot ESP32 firmware or adjust boot settings
 - **Resolution mismatch**: Adjust conversion script if BMP dimensions don't match E-Ink display resolution
 - **WiFi connectivity**: Ensure both devices are on the same network and ESP32 is within WiFi range of Pi
+- **TCP signaling fails**: Check `esp32_tcp_server.ino` Serial output for connection status
 
 ---
 
@@ -253,7 +189,7 @@ The `esp32s3.ino` sketch automatically takes photos once every minute and saves 
 - **[XIAO ESP32-S3 Getting Started Guide](https://wiki.seeedstudio.com/xiao_esp32s3_getting_started/)** - Basic board setup, flashing firmware, and configuration
 - **[ESP32 Camera Guide](https://www.seeedstudio.com/blog/2026/05/06/esp32-camera-guide/)** - Camera module setup, MJPEG streaming, and frame capture
 - **[Waveshare Spectra6 E-Ink Display](https://www.waveshare.com/wiki/4inch_e-Paper_HAT+_(E))** - Official Waveshare documentation for display configuration and driver information
-- **[WiFi Information for XIAO ESP32S3](https://wiki.seeedstudio.com/xiao_esp32s3_wifi_usage/)**
+- **[WiFi Information for XIAO ESP32S3](https://wiki.seeedstudio.com/xiao_esp32s3_wifi_usage/)** - WiFi client mode and credentials
 - **[Camera Usage for XIAO ESP32S3](https://wiki.seeedstudio.com/xiao_esp32s3_camera_usage/)** - Photo capture and SD card writing
 ### Waveshare Spectra6 E-Ink Display
 
