@@ -14,24 +14,34 @@ A hardware system that:
 
 | Component | Purpose | Notes |
 |-----------|---------|-------|
-| XIAO ESP32-S3 Sense | WiFi camera streaming | OV5640 sensor, built-in PSRAM |
-| Raspberry Pi 3 | Frame conversion & E-Ink display + SD Card | Runs Python scripts |
+| XIAO ESP32-S3 Sense | WiFi camera streaming | OV5640 sensor, PSRAM built-in, TCP/IP signaling support |
+| Raspberry Pi 3 | Frame conversion & E-Ink display + SD Card | Runs Python scripts, GPIO 26 button trigger |
 | Waveshare Spectra6 E-Ink | 4" color e-ink display | SPI interface (SPI3) |
-| Custom Button | GPIO trigger | Connected to Pi GPIO 26 |
+| Custom Button | GPIO trigger | Connected to Pi GPIO 26 (BCM Pin 37) |
 
 ## 📁 File Structure
 
 ### Project Root (`image_draw/`)
 ```
 image_draw/
-├── README.md              # Main documentation
-├── agents.md              # Agent guidelines
+├── README.md              # Main documentation (updated with esp32_tcp_server.ino details)
+├── agents.md              # Agent guidelines (this file)
+├── docs/
+│   ├── README.md         # Enhanced project documentation
+│   └── agents.md         # Agent-specific guidance
 ├── esp32s3/
-│   └── esp32s3.ino       # ESP32 camera/SD auto-capture sketch
-├── xiao_take_photo.cpp   # Standalone ESP32 photo capture example
-├── button_trigger.py      # Pi button input handler (GPIO 26)
-├── image_draw.py          # Captures frame, converts JPEG→BMP, displays on E-Ink
-├── clear.py               # Clears E-Ink display
+│   ├── esp32s3.ino      # Main ESP32 camera sketch with TCP signaling support
+│   ├── esp32_tcp_server.ino  # WiFi client mode for TCP/IP capture trigger
+│   ├── esp32_wifi_only.ino    # WiFi-only connection test
+│   ├── esp_camera.h      # ESP32 Camera library header
+│   ├── esp_camera.c      # ESP32 Camera library implementation
+│   ├── camera_pins.h     # XIAO ESP32-S3 pin definitions for OV5640
+│   ├── ESP32_OV5640_AF.h  # OV5640 auto-focus support header
+│   └── ESP32_OV5640_cfg.h  # OV5640 auto-focus configuration
+├── xiao_take_photo.cpp   # Standalone ESP32 photo capture example with AF support
+├── button_trigger.py     # Pi button input handler (GPIO 26)
+├── image_draw.py         # Captures frame, converts JPEG→BMP, displays on E-Ink
+├── clear.py              # Clears E-Ink display
 └── lib/waveshare_epd/    # E-Ink library and drivers
 ```
 
@@ -41,29 +51,47 @@ image_draw/
 
 ## 📖 Key Files
 
-| File | Purpose | Language | Location |
-|------|---------|----------|----------|
-| `esp32s3.ino` | ESP32 camera auto-capture every 60 seconds, saves to SD | Arduino (C++) | `esp32s3/esp32s3.ino` |
-| `xiao_take_photo.cpp` | Standalone ESP32 photo capture with OV5640 AF support | Arduino (C++) | Root directory |
-| `button_trigger.py` | Monitors Pi GPIO 26 button, triggers scripts | Python | Root directory |
-| `image_draw.py` | Main loop: captures stream frame → BMP → E-Ink display | Python | `/image_draw/` |
-| `cam_preview.py` | Alternative continuous preview script | Python | Root directory |
+| File | Purpose | Language | Location | Status |
+|------|---------|----------|----------|--------|
+| `esp32s3.ino` | ESP32 camera auto-capture + TCP signaling | Arduino (C++) | `esp32s3/esp32s3.ino` | Active |
+| `esp32_tcp_server.ino` | WiFi client mode, receives TCP capture trigger | Arduino (C++) | `esp32s3/esp32_tcp_server.ino` | New feature |
+| `xiao_take_photo.cpp` | Standalone ESP32 photo capture with OV5640 AF support | Arduino (C++) | Root directory | Active |
+| `button_trigger.py` | Monitors Pi GPIO 26 button, triggers scripts | Python | Root directory | Active |
+| `image_draw.py` | Main loop: captures stream frame → BMP → E-Ink display | Python | `/image_draw/` | Active |
+| `cam_preview.py` | Alternative continuous preview script | Python | Root directory | Legacy |
 
 ## 🎮 Trigger Modes
 
-### Pi Button (GPIO 26 / BCM Pin 37)
+### Pi Soldered Button (GPIO 26 / BCM Pin 37)
 - **Double-click**: Clears E-Ink display via `clear.py`
-- **3-second hold**: Captures photo via `image_draw.py`
+- **3-second hold**: Captures photo via `image_draw.py` (Pi stream mode) OR triggers ESP32 via TCP signaling (new feature)
 
-### ESP32 Auto-Capture
+### ESP32 Auto-Capture (SD Card Direct - Recommended for Portability)
 - Takes photos every 60 seconds automatically
-- Saves directly to SD card
+- Saves directly to SD card on ESP32
 - No Pi intervention needed
-- No SD card currently in XIAO, can change that if needed.
+- **Note**: Requires SD card in XIAO ESP32-S3 Sense
+
+### TCP/IP Signaling from Pi Button (New Feature)
+- Pi button press sends "CAPTURE" signal over WiFi TCP to ESP32
+- ESP32 receives signal, takes photo + stream frame, saves to SD
+- **Requires both devices on same WiFi network** (`192.168.12.x` subnet)
+
+### ESP32 Auto-Capture (SD Card Direct - Recommended for Portability)
+- Takes photos every 60 seconds automatically
+- Saves directly to SD card on ESP32
+- No Pi intervention needed
+- **Note**: Requires SD card in XIAO ESP32-S3 Sense
+
+### TCP/IP Signaling (New Feature in `esp32_tcp_server.ino`)
+- Connects ESP32 to home WiFi client mode (`"dangus"` network)
+- Pi sends "CAPTURE" signal via TCP on port 80/8080
+- ESP32 takes photo and saves to SD immediately
+- **Requires both devices on same WiFi network**
 
 ## 🔌 XIAO ESP32-S3 Camera Pins
 
-For OV5640 expansion board setup:
+For OV5640 expansion board setup (Seeed Wiki default pin mapping):
 
 | GPIO | Signal | Description |
 |------|--------|-------------|
@@ -103,33 +131,73 @@ pip3 install opencv-python Pillow scapy requests
 - Overlay configuration: `spi3-hd430pga5a-8bit=2,0`
 - May require additional overlay settings in `/boot/config.txt`
 
+### Current Network Configuration
+
+| Device | IP Address | Network Mode | Port Used |
+|--------|------------|--------------|-----------|
+| ESP32 (WiFi Client) | `192.168.12.228` | WiFi Client (`"dangus"` network) | 80 |
+| Raspberry Pi | `192.168.12.106` | Home WiFi client | 80 |
+
 ## 📡 ESP32 Camera Stream Endpoint
 
-When ESP32 is streaming MJPEG frames:
+When ESP32 is streaming MJPEG frames (continuous mode):
 ```
 http://<ESP32_IP>:8080/stream.txt
 ```
 
-### ESP32 Setup Options
+### TCP/IP Signaling Endpoint (New Feature)
+When ESP32 receives signals via WiFi client mode:
+```
+TCP connection to <ESP32_IP>:80
+Send "CAPTURE" keyword when Pi button is held for 3 seconds
+```
 
-**Option A: WiFi Network Mode (Requires Pi to connect to ESP32)**
-- Connect ESP32 to home WiFi first
-- Get IP from `ipconfig /all` on Windows
+## 🔌 ESP32 WiFi Setup Options
+
+**Option A: WiFi Client Mode (Recommended)**
+- Connect ESP32 to home WiFi network (`SSID`, `PW`)
+- ESP32 gets IP via DHCP
+- Uses Wi-Fi client mode for receiving signals from Pi
+- Example credentials: `WiFi.begin("dangus", "eraserhead")`
 
 **Option B: Access Point Mode (For standalone use)**
 - Default SSID: `XIAO_ESP32S3_Sense`
 - Default Password: `seeedstudio`
-- AP IP: Usually `192.168.4.1`
+- AP IP: Usually `192.168.4.1` (configurable)
+- Requires Pi to connect to ESP32's network
+
+### WiFi Connection Issues
+
+| Symptom | Cause | Solution |
+|---------|-------|----------|
+| "Connection failed" | Wrong WiFi credentials | Verify SSID and password in `esp32s3.ino` |
+| No IP address assigned | DHCP issue or max retries exceeded | Reboot ESP32, check Serial output for error details |
+| "WiFi.status() == WL_NO_SIGNAL" | Out of range from router | Move closer to router or use AP mode |
+| CAPTURE signal ignored | Wrong IP/Port in `button_trigger.py` | Update with actual ESP32 IP (e.g., `192.168.12.228`) |
 
 ## 🔌 Pi → ESP32 Communication
 
 To enable ESP32 photo capture triggered by Pi button signals:
 
-### TCP/IP Signaling (Recommended)
-1. Modify `esp32s3.ino` to listen for TCP/IP signals via WiFi
-2. Pi button press triggers Python script
-3. Python sends signal to ESP32 over WiFi
-4. ESP32 receives signal, takes photo, saves to SD
+### TCP/IP Signaling (New Recommended Approach)
+
+1. Connect ESP32 to home WiFi (`WiFi.begin("dangus", "eraserhead")`)
+2. Configure Pi `button_trigger.py` script with correct IP
+3. Verify both devices on **same network** for TCP communication
+4. Update URLs in `button_trigger.py`:
+   ```python
+   ESP32_CAPTURE_ENDPOINT = "http://192.168.12.228:80/capture"  # Actual IPs!
+   ```
+
+5. Pi button press (hold 3s) triggers Python script → sends signal to ESP32
+6. ESP32 receives signal via WiFi client mode, takes photo, saves to SD
+
+### Troubleshooting TCP Connection Issues
+
+| Symptom | Cause | Solution |
+|---------|-------|----------|
+| "Connection refused" | Wrong IP/Port in `button_trigger.py` | Update with actual ESP32 IP from Serial output |
+| No connection at all | Router blocking inter-device traffic | Ensure both on same subnet, check firewall |
 
 ## 🛠️ Development Environments
 
@@ -166,7 +234,6 @@ current as part of the work, not as an afterthought:
 - Fill out the PR body using the template: what changed, why, and how to test.
 - If the user mentions a GitHub issue, include `Closes #<number>` in the PR body so it auto-closes on merge.
 - Always open PRs as drafts (`gh pr create --draft`); let a human mark them ready for review.
-
 
 ## Branch naming
 
@@ -211,12 +278,14 @@ deciding yourself. **Open PRs as drafts** (`gh pr create --draft`) and let a hum
 ready for review — this prevents accidental merges.
 
 - Use the same type classification rules as [Branch naming](#branch-naming) — the vocabulary heuristics and "when in doubt, ask" rule apply here too.
+
 ## ⚙️ Troubleshooting
 
 ### ESP32 Connection Issues
 - Camera won't start: Check LED status and serial output
-- WiFi connection fails: Reboot ESP32 or try default AP credentials
+- WiFi connection fails: Reboot ESP32, try default AP credentials or check password
 - "CAMERA" error in stream: Verify camera firmware is running
+- TCP signaling ignored: Wrong IP/Port in `button_trigger.py`
 
 ### Pi/Display Issues
 - E-Ink not responding: Verify SPI3 connection and library loaded
@@ -225,7 +294,7 @@ ready for review — this prevents accidental merges.
 
 ## 📚 Documentation References
 
-- **ESP32-S3**: Seeed Wiki - `xiao_esp32s3_camera_usage/`, `wifi_usage/`
+- **ESP32-S3**: Seeed Wiki - `xiao_esp32s3_getting_started/`, `wifi_usage/`
 - **E-Ink**: Waveshare documentation for Spectra6 E-Paper HAT
 - **OV5640**: Auto-focus firmware from github.com/0015/ESP32-OV5640-AF
 
@@ -240,14 +309,7 @@ ready for review — this prevents accidental merges.
 | SD card write to ESP32 | Use `File.write(data, len)` pattern | All C++ sketches |
 | Pi script modifications | Check existing `button_trigger.py` structure | `/image_draw/*.py` |
 | WiFi connectivity | Try AP mode or client mode, adjust credentials | Both sides |
-
-### Tools Available for Agents in This Repo
-
-- **Grep**: Search Python/Arduino code patterns
-- **Glob**: Find files matching patterns (`**/*.cpp`, `**/*.py`)
-- **Read**: Full file content (up to 2000 lines)
-- **WebFetch**: Seeed Wiki pages for ESP32 documentation
-- **Bash**: Execute shell commands on Pi or local testing
+| TCP/IP signaling | Use `esp32_tcp_server.ino` with WiFi client mode, verify IP in `button_trigger.py` | New files |
 
 ### Best Practices
 
@@ -258,6 +320,19 @@ ready for review — this prevents accidental merges.
 5. **E-Ink display uses SPI3** - Verify overlay config in `/boot/config.txt`
 6. **Camera stream endpoint** - Typically `8080/stream.txt` on ESP32
 
+### New: TCP/IP Signaling Pattern
+
+When working with the new `esp32_tcp_server.ino`:
+
+1. Ensure ESP32 is connected to WiFi client mode (`WiFi.begin("dangus", "eraserhead")`)
+2. Get actual ESP32 IP from Serial Monitor output (e.g., `192.168.12.228`)
+3. Update `button_trigger.py` with correct IP and port:
+   ```python
+   ESP32_IP = "192.168.12.228"  # Replace with actual IP
+   ESPTCP_PORT = 80             # Default, can change to 8080 if needed
+   ```
+4. Verify both devices on same subnet/network
+
 ### Memory Patterns for AI Agents
 
 Use these memory file patterns:
@@ -265,18 +340,15 @@ Use these memory file patterns:
 - `reference`: External documentation links (Seeed Wiki URLs)
 - `project`: Ongoing tasks like "extend ESP32 button-trigger", "add WiFi communication"
 
-## ⚠️ Important Notes
-
-1. The `esp32s3.ino` currently has **no working code** beyond camera config - it's a template to be completed with actual capture/button logic
-2. The OV5640 auto-focus requires switching to SXGA resolution (minimum 1280×1024) before focusing
-3. `image_draw.py` is the main active Python script that captures stream frames
-4. `button_trigger.py` on Pi monitors GPIO 26 for double-click and 3-second hold triggers
-
 ## 🔮 Future Enhancement Goals
 
-- [ ] Enable ESP32 photo capture triggered by TCP signal from Pi button
+- [x] Implement TCP/IP signaling in `esp32_tcp_server.ino`
+- [ ] Fix ESP32 WiFi connection issue (device not connecting to "dangus" network)
 - [ ] Remove auto-capture timer when using button-trigger mode
 - [ ] Add status LED or serial output for ESP32 to confirm capture success
 - [ ] Support different camera resolutions via configuration option
 - [ ] Add JPEG quality setting in `esp32s3.ino`
 
+---
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)

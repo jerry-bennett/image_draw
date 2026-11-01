@@ -1,6 +1,6 @@
 # Pull Request Template
 
-**Branch naming format:** `type/short-desc` (e.g., `fix/overclock-esp32-camera`)  
+**Branch naming format:** `type/short-desc` (e.g., `fix/esp32-wifi-tcp`)  
 **Format:** `type(scope): message` with body containing "What Changed", "Why", and "How to Test"
 
 ---
@@ -44,28 +44,49 @@ Include prerequisites, expected results, and verification steps. -->
 
 ```bash
 # Install/verify dependencies
-pip install opencv-python Pillow
+pip install opencv-python Pillow scapy requests
 python --version
 
 # Ensure hardware is ready (ESP32 streaming via WiFi)
-# Verify stream endpoint works: http://<ESP32_IP>:8080/stream.txt
+# Get ESP32 IP from Serial Monitor: http://<ESP32_IP>:8080/stream.txt
+# Verify stream endpoint works:
 ```
 
 ### Testing Steps
 
 1. **Verify baseline functionality** - Confirm existing behavior before changes
+   - ESP32 connects to "dangus" WiFi network (password: eraserhead)
+   - Serial Monitor shows `ESP32 IP: xxx`
+   - Stream endpoint accessible at correct port (`8080`)
+
 2. **Apply change** - Run or deploy the modified code
+   - Upload ESP32 sketch to board
+   - Ensure `button_trigger.py` is running on Pi
+   - Verify TCP signal path from Pi → ESP32
+
 3. **Expected result** - What should happen with correct inputs
-4. **Edge cases** - Test boundary conditions (e.g., no SD card, disconnected WiFi)
+   - Pi button press (hold 3s) triggers capture request
+   - ESP32 receives signal via TCP at specified endpoint
+   - Serial output confirms "CAPTURE keyword detected!"
+   
+4. **Edge cases** - Test boundary conditions 
+   - Incorrect WiFi credentials → connection fails after 120s timeout
+   - Wrong IP/Port in `button_trigger.py` → connection refused error
+   - Pi off from WiFi network → TCP handshake fails
 
 ### Expected Output Examples
 
 ```bash
-$ python script.py
-# Should produce: "Photo saved successfully" or similar success message
+# ESP32 Serial Monitor output during test
+ESP32 connected!
+ESP32 IP: 192.168.12.228
+Connected to 192.168.12.228:80
+CAPTURE keyword detected!
+--- CAPTURE REQUEST RECEIVED ---
 
-$ curl http://<ESP32_IP>:8080/stream.txt
-# Should return valid JPEG frames (~2 FPS, not "CAMERA" error)
+# Pi output from button_trigger.py
+Sending WiFi capture request to http://<ESP32_IP>:80/capture
+WiFi capture signal sent!
 ```
 
 ---
@@ -75,9 +96,9 @@ $ curl http://<ESP32_IP>:8080/stream.txt
 <!-- 
 Optional: include breaking changes, deprecation warnings, or migration guides -->
 
-- **Breaking changes:** Will require updates to dependent code
-- **Deprecation:** Marking `component` for removal in next major version
-- **Configuration changes:** New settings in `config.yaml` requiring restart
+- **Breaking changes:** Will require updates to dependent code (update IPs in `button_trigger.py`)
+- **Configuration:** ESP32 must connect to same WiFi as Pi for TCP communication
+- **Network requirements:** Both devices on same subnet; router/firewall not blocking inter-device traffic
 
 ---
 
@@ -86,9 +107,10 @@ Optional: include breaking changes, deprecation warnings, or migration guides --
 <!-- 
 Include if this PR requires deployment steps, configuration changes, or infrastructure updates -->
 
-- No deployment needed (local testing only)
-- Update Docker Compose: `compose.yaml:1024` section
-- Rollback plan: [steps to revert if issue occurs]
+- Upload ESP32 sketch via Arduino IDE Serial Monitor
+- Verify IP addresses in `button_trigger.py` match actual device IPs
+- Restart Pi to reload `button_trigger.py` script
+- Test button trigger from GPIO 26 (hold 3 seconds)
 
 ---
 
